@@ -1,0 +1,7 @@
+/* Custom CSS to increase the camera input preview height */
+.st-emotion-cache-1e74x3a > div:nth-child(1) {
+    min-height: 400px; /* Increase this value for a taller box */
+}
+.st-emotion-cache-1e74x3a .st-emotion-cache-12fmw1f {
+    height: 100%;
+}
