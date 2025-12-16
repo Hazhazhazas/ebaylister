@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>eBay Listing Capture</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    body { font-family: system-ui, Arial; margin: 16px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+    .card { border:1px solid #ddd; border-radius:12px; overflow:hidden; background:#fff; position:relative; }
+    .card img { width:100%; height:120px; object-fit:cover; display:block; }
+    .badge { position:absolute; top:6px; left:6px; background:#000; color:#fff; padding:2px 8px; border-radius:999px; font-size:12px; opacity:.8; }
+    .btn { padding:10px 12px; border-radius:12px; border:1px solid #333; background:#fff; }
+    .btn.primary { background:#111; color:#fff; border-color:#111; }
+    .btn.danger { border-color:#b00; color:#b00; }
+    .status { margin-top:12px; white-space:pre-wrap; font-size:14px; }
+    .small { font-size:12px; color:#666; }
+    input[type="file"] { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h2>eBay Photo Capture (max 20)</h2>
+
+  <div class="row">
+    <input id="fileInput" type="file" accept="image/*" capture="environment" multiple />
+    <button class="btn danger" id="clearBtn">Clear</button>
+  </div>
+
+  <div class="small">
+    Tap an image to delete. Drag to reorder. Then Upload → Create Listing.
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <div class="row" style="margin-top: 12px;">
+    <button class="btn primary" id="uploadBtn">Upload + Create Listing</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script type="module" src="/app.js"></script>
+  <script>
+    // simple SW registration
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+  </script>
+</body>
+</html>
