@@ -7,10 +7,10 @@ from PIL import Image
 import requests
 import json
 import uuid
-from io import BytesIO
 import google.generativeai as genai
 
 # --- Initializing FastAPI ---
+# The Procfile expects the variable 'app' from the module 'main'
 app = FastAPI()
 
 # --- Load Environment Variables (API Keys and Constants) ---
@@ -19,7 +19,7 @@ EBAY_TOKEN = os.environ.get("EBAY_TOKEN")
 EBAY_SANDBOX_URL = "https://api.sandbox.ebay.com/sell/inventory/v1"
 
 # NOTE: These policy IDs MUST be replaced with your actual eBay Sandbox Policy IDs!
-# Get these from your eBay Developer Account > Sell API > Policy Management
+# If these are wrong, the final 'create_offer' step will fail with a 400 Bad Request.
 POLICY_IDS = {
     "fulfillment": "1234567890", 
     "payment": "9876543210",    
@@ -33,7 +33,7 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"Gemini client configuration failed: {e}")
 
-# --- CORE EBAY & AI HELPER FUNCTIONS (Migrated from Streamlit) ---
+# --- CORE EBAY & AI HELPER FUNCTIONS ---
 
 def analyze_image_with_gemini(image):
     """Sends image to Gemini 1.5 Flash for structured data extraction."""
@@ -158,8 +158,7 @@ def create_offer(sku, item_data):
     return None
 
 
-# --- CUSTOM CAMERA HTML/JS FRONTEND (UNCHANGED) ---
-# ... (The HTML/CSS/JavaScript code remains here) ...
+# --- CUSTOM CAMERA HTML/JS FRONTEND ---
 
 CAMERA_HTML = """
 <!DOCTYPE html>
@@ -302,7 +301,8 @@ CAMERA_HTML = """
             formData.append('file', imageBlob, 'listing_photo.jpg');
 
             try {
-                const response = await fetch('/upload-and-analyze/', {
+                // FIXED: Using the full path with a trailing slash to match FastAPI exactly
+                const response = await fetch('/upload-and-analyze/', { 
                     method: 'POST',
                     body: formData
                 });
@@ -324,6 +324,7 @@ CAMERA_HTML = """
                     statusDiv.textContent = 'API Error occurred.';
                     resultsDiv.innerHTML = `
                         <h2>❌ API Error</h2>
+                        <p>Status: ${response.status}</p>
                         <pre class="error">${JSON.stringify(data, null, 2)}</pre>
                     `;
                 }
@@ -369,7 +370,7 @@ async def upload_and_analyze(file: UploadFile = File(...)):
         image_stream = io.BytesIO(contents)
         img = Image.open(image_stream)
         
-        # 3. AI ANALYSIS (Uses the real Gemini function)
+        # 3. AI ANALYSIS (Error handled with try/except in the calling block)
         listing_data = analyze_image_with_gemini(img)
         
         # 4. EBAY IMAGE UPLOAD
@@ -398,11 +399,11 @@ async def upload_and_analyze(file: UploadFile = File(...)):
         }
         
     except requests.exceptions.HTTPError as e:
-        # Catch specific HTTP errors from the eBay API calls
+        # Catches specific HTTP errors from the eBay API calls
         error_details = {"error": f"API Request Failed: {e}", "response": e.response.json() if e.response else None}
         raise HTTPException(status_code=e.response.status_code if e.response is not None else 500, detail=error_details)
     except Exception as e:
-        # Catch any other unexpected errors
+        # Catches any other unexpected errors, including those from Gemini
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {e}")
 
 # If you run this file locally, it will start the Uvicorn server
