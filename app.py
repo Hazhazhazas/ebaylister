@@ -12,11 +12,11 @@ st.set_page_config(
 )
 
 # --- SECRETS: Accessing your keys securely ---
+# NOTE: These keys MUST be set in the Streamlit Cloud Secrets Manager!
 try:
-    # These keys are read from the Streamlit Cloud Secrets Manager!
     GEMINI_KEY = st.secrets["GEMINI_KEY"]
     EBAY_TOKEN = st.secrets["EBAY_TOKEN"]
-except:
+except KeyError:
     st.error("🚨 Missing API Keys. Please set GEMINI_KEY and EBAY_TOKEN in Streamlit Secrets.")
     st.stop()
 
@@ -30,7 +30,7 @@ def analyze_image(image):
     """Sends image to Gemini 1.5 Flash for structured data extraction."""
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # Using the prompt we finalized earlier to force JSON output
+    # System prompt to force structured JSON output for easy parsing
     prompt = """
     You are an expert e-commerce product listing specialist for eBay. Your task is to analyze the provided image of a single product and generate a complete, structured draft listing.
     Return ONLY a single, raw JSON object. Do not include any text before or after the JSON, and do not use Markdown fencing.
@@ -46,15 +46,12 @@ def analyze_image(image):
     """
     
     response = model.generate_content([prompt, image])
-    # Simple cleanup to handle minor formatting differences
+    # Simple cleanup to handle minor formatting differences from the model
     clean_text = response.text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean_text)
 
 def push_draft_to_ebay_sandbox(item_data):
-    """Mocks the final push to eBay Sandbox for testing."""
-    # NOTE: This is a placeholder. Real implementation requires multi-step process
-    # (1. Upload Image, 2. Create Inventory Item, 3. Create Offer).
-    # For the test phase, we ensure the connection is live.
+    """Mocks the final push to eBay Sandbox for testing connection."""
     
     headers = {
         "Authorization": f"Bearer {EBAY_TOKEN}",
@@ -65,8 +62,8 @@ def push_draft_to_ebay_sandbox(item_data):
     response = requests.get(f"{EBAY_SANDBOX_URL}/inventory_item", headers=headers)
     
     if response.status_code == 200:
-        st.success(f"✅ eBay Sandbox Connection Success! Token is valid.")
-        st.info("The next step (not in this script) is creating the listing draft.")
+        st.success(f"✅ eBay Sandbox Connection Success! Token is valid (Status 200).")
+        st.info("The next step in development is implementing the multi-step eBay listing API flow.")
         return True
     else:
         st.error(f"❌ eBay Connection Failed. Status Code: {response.status_code}")
@@ -78,6 +75,10 @@ def push_draft_to_ebay_sandbox(item_data):
 
 st.header("Upload & Analyze")
 
+# ******* ADJUSTMENT HERE: ADDING VERTICAL SPACE *******
+st.space("large") 
+# ******************************************************
+
 # The camera input widget is perfect for mobile use
 picture = st.camera_input("Snap a photo of the item to list")
 
@@ -88,12 +89,14 @@ if picture:
     if st.button("✨ Generate & Test Connection"):
         with st.spinner("1. Analyzing image with Gemini..."):
             try:
+                # 1. AI Analysis
                 listing_data = analyze_image(img)
                 st.session_state['listing_data'] = listing_data
                 
             except json.JSONDecodeError as e:
                 st.error("Gemini output was not perfect JSON. Please try another image or edit the prompt.")
-                st.write(response.text)
+                # Show the raw text output for debugging
+                # st.write(response.text) 
                 st.stop()
             except Exception as e:
                 st.error(f"An unexpected error occurred during analysis: {e}")
@@ -104,7 +107,7 @@ if 'listing_data' in st.session_state:
     st.divider()
     st.subheader("📝 AI Draft & Connection Test")
     
-    # Display results from Gemini
+    # Display results from Gemini in editable text boxes
     st.text_input("Title (Edit here):", value=st.session_state['listing_data']['title'])
     st.text_area("Description (Edit here):", value=st.session_state['listing_data']['description'], height=100)
     st.markdown(f"**Brand:** `{st.session_state['listing_data']['brand']}` | **Condition:** `{st.session_state['listing_data']['condition']}`")
