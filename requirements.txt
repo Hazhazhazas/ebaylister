@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 gunicorn
-python-multipart
-google-genai==0.1.0  # Use the newer, official SDK name
+httpx       
 Pillow
-requests
+pydantic
+# ... other requirements
