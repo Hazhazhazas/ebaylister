@@ -4,6 +4,28 @@ from PIL import Image
 import requests
 import json
 
+# --- Helper to load Custom CSS for styling ---
+def load_css(file_name):
+    """Loads a custom CSS file into the Streamlit app."""
+    try:
+        with open(file_name) as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning(f"CSS file not found: {file_name}")
+
+# --- GLOBAL HTML OVERRIDE FOR MAX HEIGHT ---
+# This attempts to ensure the root container uses the full screen height
+st.markdown("""
+    <style>
+    .main {
+        max-width: 100%;
+        padding-top: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+# ---------------------------------------------
+
+
 # --- Page Configuration (For Mobile App Feel) ---
 st.set_page_config(
     page_title="eBay Lister",
@@ -11,8 +33,10 @@ st.set_page_config(
     layout="centered"
 )
 
+# Load the custom CSS file you created
+load_css(".streamlit/style.css")
+
 # --- SECRETS: Accessing your keys securely ---
-# NOTE: These keys MUST be set in the Streamlit Cloud Secrets Manager!
 try:
     GEMINI_KEY = st.secrets["GEMINI_KEY"]
     EBAY_TOKEN = st.secrets["EBAY_TOKEN"]
@@ -30,7 +54,6 @@ def analyze_image(image):
     """Sends image to Gemini 1.5 Flash for structured data extraction."""
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # System prompt to force structured JSON output for easy parsing
     prompt = """
     You are an expert e-commerce product listing specialist for eBay. Your task is to analyze the provided image of a single product and generate a complete, structured draft listing.
     Return ONLY a single, raw JSON object. Do not include any text before or after the JSON, and do not use Markdown fencing.
@@ -46,7 +69,6 @@ def analyze_image(image):
     """
     
     response = model.generate_content([prompt, image])
-    # Simple cleanup to handle minor formatting differences from the model
     clean_text = response.text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean_text)
 
@@ -58,7 +80,6 @@ def push_draft_to_ebay_sandbox(item_data):
         "Content-Type": "application/json"
     }
     
-    # Test call: Attempting to retrieve inventory to confirm token is valid
     response = requests.get(f"{EBAY_SANDBOX_URL}/inventory_item", headers=headers)
     
     if response.status_code == 200:
@@ -75,11 +96,7 @@ def push_draft_to_ebay_sandbox(item_data):
 
 st.header("Upload & Analyze")
 
-# ******* ADJUSTMENT HERE: ADDING VERTICAL SPACE *******
-st.space("large") 
-# ******************************************************
-
-# The camera input widget is perfect for mobile use
+# The camera input is styled using the custom CSS
 picture = st.camera_input("Snap a photo of the item to list")
 
 if picture:
@@ -93,10 +110,8 @@ if picture:
                 listing_data = analyze_image(img)
                 st.session_state['listing_data'] = listing_data
                 
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 st.error("Gemini output was not perfect JSON. Please try another image or edit the prompt.")
-                # Show the raw text output for debugging
-                # st.write(response.text) 
                 st.stop()
             except Exception as e:
                 st.error(f"An unexpected error occurred during analysis: {e}")
