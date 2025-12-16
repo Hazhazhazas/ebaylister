@@ -1,0 +1,16 @@
+# render.yaml configuration file
+services:
+  - type: web
+    name: ebay-ai-lister
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
+    
+    # We set the environment variables here, which your main.py will need.
+    envVars:
+      # These must be set manually in the Render dashboard
+      # Go to your Web Service -> Environment -> Add Environment Variable
+      - key: GEMINI_KEY
+        sync: false
+      - key: EBAY_TOKEN
+        sync: false
