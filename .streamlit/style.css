@@ -1,8 +1,12 @@
-/* Custom CSS to aggressively increase the camera input preview height */
+/* Custom CSS to force a taller camera input */
 
-/* Targeting the specific element responsible for wrapping the camera input */
-/* This selector targets the element that contains the label "Snap a photo..." */
-div[data-testid="stFormSubmitButton"] + div > div:nth-child(1) {
-    min-height: 400px; /* Use 500px or more if 400px isn't enough */
-    height: 100%;
+/* 1. Target the specific div that contains the camera input's internal components */
+div[data-testid="stCameraInput"] .st-emotion-cache-1e74x3a > div:nth-child(1) {
+    min-height: 400px !important; /* Forces a minimum height */
+    height: 100% !important;
+}
+
+/* 2. Ensure the parent elements aren't limiting the height */
+.block-container, div[data-testid="stVerticalBlock"] {
+    max-width: 100% !important;
 }
