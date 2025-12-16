@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+gunicorn
+python-multipart  # Required by FastAPI for handling image uploads
+google-generativeai
+Pillow
+requests
