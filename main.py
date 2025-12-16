@@ -1,21 +1,47 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import HTMLResponse
 import uvicorn
+import os
 import io
 from PIL import Image
 
 # --- Initializing FastAPI ---
-# We use 'app' here because that's what the Procfile expects: main:app
 app = FastAPI()
 
-# --- Simple Root Endpoint (To confirm the server is running) ---
-@app.get("/")
-def read_root():
-    return {"message": "Server is running! Ready for image upload."}
+# --- Load Environment Variables (API Keys) ---
+GEMINI_KEY = os.environ.get("GEMINI_KEY")
+EBAY_TOKEN = os.environ.get("EBAY_TOKEN")
 
-# --- Image Upload Endpoint (This will replace your Streamlit logic) ---
-# This endpoint uses standard FastAPI and Python-Multipart to handle image data.
+# Simple check to ensure keys are loaded on Render
+if not GEMINI_KEY or not EBAY_TOKEN:
+    print("WARNING: GEMINI_KEY or EBAY_TOKEN not found in environment variables!")
+    # NOTE: On Render, you must set these variables in the dashboard.
+
+# --- Simple Root Endpoint (Placeholder for the camera UI) ---
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    # This is a placeholder HTML page that will host your custom camera UI
+    # We will replace this with the full camera/JS code later.
+    html_content = """
+    <html>
+        <head>
+            <title>eBay AI Lister</title>
+        </head>
+        <body>
+            <h1>eBay AI Lister Backend</h1>
+            <p>Server is running! This is the API backend for your custom camera frontend.</p>
+            <p>API Endpoint: <code>/upload-and-analyze/</code></p>
+        </body>
+    </html>
+    """
+    return html_content
+
+# --- Image Upload Endpoint (Placeholder for your AI/eBay logic) ---
 @app.post("/upload-and-analyze/")
 async def upload_and_analyze(file: UploadFile = File(...)):
+    if not GEMINI_KEY or not EBAY_TOKEN:
+        raise HTTPException(status_code=500, detail="API Keys are missing. Check Render environment variables.")
+
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
@@ -27,16 +53,12 @@ async def upload_and_analyze(file: UploadFile = File(...)):
         # Open the image using PIL (Pillow)
         img = Image.open(image_stream)
         
-        # NOTE: Your AI/eBay logic will go here. For now, we just return the image info.
-        
-        # Example of AI/eBay logic placement:
-        # listing_data = analyze_image(img)
-        # image_id = upload_image_to_ebay(contents, file.filename)
+        # *** The full AI/eBay logic will go here (from your Streamlit app) ***
         
         return {
             "filename": file.filename,
-            "content_type": file.content_type,
-            "status": "Image received and processed by FastAPI."
+            "size_bytes": len(contents),
+            "status": "Image received and keys checked successfully."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {e}")
