@@ -3,28 +3,7 @@ import google.generativeai as genai
 from PIL import Image
 import requests
 import json
-
-# --- Helper to load Custom CSS for styling ---
-def load_css(file_name):
-    """Loads a custom CSS file into the Streamlit app."""
-    try:
-        with open(file_name) as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning(f"CSS file not found: {file_name}")
-
-# --- GLOBAL HTML OVERRIDE FOR MAX HEIGHT ---
-# This attempts to ensure the root container uses the full screen height
-st.markdown("""
-    <style>
-    .main {
-        max-width: 100%;
-        padding-top: 1rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-# ---------------------------------------------
-
+from io import BytesIO # Needed to handle the image data
 
 # --- Page Configuration (For Mobile App Feel) ---
 st.set_page_config(
@@ -32,9 +11,6 @@ st.set_page_config(
     page_icon="📸",
     layout="centered"
 )
-
-# Load the custom CSS file you created
-load_css(".streamlit/style.css")
 
 # --- SECRETS: Accessing your keys securely ---
 try:
@@ -72,63 +48,92 @@ def analyze_image(image):
     clean_text = response.text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean_text)
 
-def push_draft_to_ebay_sandbox(item_data):
-    """Mocks the final push to eBay Sandbox for testing connection."""
+def upload_image_to_ebay(image_bytes, image_name):
+    """
+    Uploads the image to the eBay Media API (Sandbox) and returns the EPS URL.
+    """
+    url = f"{EBAY_SANDBOX_URL}/file"
     
     headers = {
-        "Authorization": f"Bearer {EBAY_TOKEN}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {st.secrets['EBAY_TOKEN']}",
+        "X-API-COMPATIBILITY-VERSION": "1.0.0",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        # Content-Type is set automatically by requests for multipart data
     }
     
-    response = requests.get(f"{EBAY_SANDBOX_URL}/inventory_item", headers=headers)
+    # Prepare the multipart data
+    files = {
+        'file': (image_name, image_bytes, 'image/jpeg') 
+    }
     
-    if response.status_code == 200:
-        st.success(f"✅ eBay Sandbox Connection Success! Token is valid (Status 200).")
-        st.info("The next step in development is implementing the multi-step eBay listing API flow.")
-        return True
-    else:
-        st.error(f"❌ eBay Connection Failed. Status Code: {response.status_code}")
+    try:
+        response = requests.post(url, headers=headers, files=files)
+        response.raise_for_status()
+        
+        image_info = response.json()
+        return image_info.get('fileId') # This is the unique file ID (EPS URL)
+    
+    except requests.exceptions.HTTPError as e:
+        st.error(f"Image Upload Failed. Check token scope and marketplace ID.")
         st.json(response.json())
-        return False
+        return None
+    except Exception as e:
+        st.error(f"An unexpected error occurred during image upload: {e}")
+        return None
 
 
 # --- THE MAIN APP UI ---
 
 st.header("Upload & Analyze")
 
-# The camera input is styled using the custom CSS
+# The camera input widget
 picture = st.camera_input("Snap a photo of the item to list")
 
 if picture:
+    # Convert Streamlit's file object into a PIL Image and BytesIO object
     img = Image.open(picture)
     st.image(img, caption='Item Preview', width=300)
     
-    if st.button("✨ Generate & Test Connection"):
+    # Create the bytes object needed for the API call
+    img_byte_arr = BytesIO()
+    img.save(img_byte_arr, format='JPEG')
+    image_bytes = img_byte_arr.getvalue()
+
+    if st.button("✨ Generate & Upload Image"):
+        
+        # --- PHASE 1: AI Analysis ---
         with st.spinner("1. Analyzing image with Gemini..."):
             try:
-                # 1. AI Analysis
                 listing_data = analyze_image(img)
                 st.session_state['listing_data'] = listing_data
-                
-            except json.JSONDecodeError:
-                st.error("Gemini output was not perfect JSON. Please try another image or edit the prompt.")
-                st.stop()
             except Exception as e:
-                st.error(f"An unexpected error occurred during analysis: {e}")
+                st.error(f"AI Analysis Failed: {e}")
+                st.stop()
+        
+        # --- PHASE 2: Image Upload to eBay Sandbox ---
+        with st.spinner("2. Uploading image to eBay Sandbox..."):
+            image_id = upload_image_to_ebay(image_bytes, f"listing_{st.session_state.get('listing_data', {}).get('title', 'item')}.jpg")
+            if image_id:
+                st.session_state['image_id'] = image_id
+            else:
+                st.error("Image upload failed. Cannot proceed.")
                 st.stop()
 
+
 # --- Display Results and Test Button ---
-if 'listing_data' in st.session_state:
+if 'listing_data' in st.session_state and 'image_id' in st.session_state:
     st.divider()
-    st.subheader("📝 AI Draft & Connection Test")
+    st.subheader("📝 AI Draft & Image Ready")
+    
+    st.success(f"Image Uploaded Successfully! eBay File ID: `{st.session_state['image_id']}`")
     
     # Display results from Gemini in editable text boxes
-    st.text_input("Title (Edit here):", value=st.session_state['listing_data']['title'])
-    st.text_area("Description (Edit here):", value=st.session_state['listing_data']['description'], height=100)
+    title = st.text_input("Title (Edit here):", value=st.session_state['listing_data']['title'], key='input_title')
+    description = st.text_area("Description (Edit here):", value=st.session_state['listing_data']['description'], height=100, key='input_description')
     st.markdown(f"**Brand:** `{st.session_state['listing_data']['brand']}` | **Condition:** `{st.session_state['listing_data']['condition']}`")
     st.markdown(f"**Category Keywords:** `{st.session_state['listing_data']['category_keyword']}`")
     
-    # Final Test Button
-    if st.button("🚀 Confirm eBay Token is Working"):
-        with st.spinner("2. Testing eBay Sandbox API connection..."):
-            push_draft_to_ebay_sandbox(st.session_state['listing_data'])
+    # Final Test Button (Ready for Step 3: Create Inventory Item)
+    if st.button("🚀 GO! Create eBay Inventory Draft"):
+        st.warning("Next step coming soon...")
+        # The next function (create_inventory_item) will go here!
