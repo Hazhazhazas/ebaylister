@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 gunicorn
-python-multipart  # Required by FastAPI for handling image uploads
-google-generativeai
+python-multipart
+google-genai==0.1.0  # Use the newer, official SDK name
 Pillow
 requests
