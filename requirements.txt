@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-gunicorn
-httpx       
-Pillow
-pydantic
-# ... other requirements
